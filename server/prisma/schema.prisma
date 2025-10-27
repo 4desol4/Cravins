@@ -1,0 +1,316 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "mongodb"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+    id            String           @id @default(auto()) @map("_id") @db.ObjectId
+    email         String           @unique
+    password      String
+    firstName     String
+    lastName      String
+    role          UserRole         @default(USER)
+    hasPaid       Boolean          @default(false)
+    paymentExpiry DateTime?
+    paymentType   PaymentPlanType?
+    avatar        String?
+    phone         String?
+    dateOfBirth   DateTime?
+    createdAt     DateTime         @default(now())
+    updatedAt     DateTime         @updatedAt
+
+    // Relations
+    testResults       TestResult[]
+    chatSessions      ChatSession[]
+    payments          Payment[]
+    newsViews         NewsView[]
+    materialDownloads MaterialDownload[]
+
+    @@map("users")
+}
+
+model PaymentSettings {
+    id                String   @id @default(auto()) @map("_id") @db.ObjectId
+    monthlyEnabled    Boolean  @default(true)
+    monthlyPrice      Float    @default(2000)
+    yearlyEnabled     Boolean  @default(true)
+    yearlyPrice       Float    @default(18000)
+    lifetimeEnabled   Boolean  @default(true)
+    lifetimePrice     Float    @default(50000)
+    paymentsEnabled   Boolean  @default(true)
+    freeQuestionLimit Int      @default(5)
+    updatedAt         DateTime @updatedAt
+    createdAt         DateTime @default(now())
+
+    @@map("payment_settings")
+}
+
+model Subject {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    name        String   @unique
+    description String?
+    isActive    Boolean  @default(true)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    topics    Topic[]
+    questions Question[]
+    videos    Video[]
+
+    @@map("subjects")
+}
+
+model Topic {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    name      String
+    subjectId String   @db.ObjectId
+    isActive  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    subject   Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+    questions Question[]
+
+    @@unique([name, subjectId])
+    @@map("topics")
+}
+
+model Question {
+    id            String     @id @default(auto()) @map("_id") @db.ObjectId
+    text          String
+    options       String[]
+    correctAnswer Int
+    explanation   String?
+    difficulty    Difficulty @default(MEDIUM)
+    subjectId     String     @db.ObjectId
+    topicId       String     @db.ObjectId
+    isActive      Boolean    @default(true)
+    createdAt     DateTime   @default(now())
+    updatedAt     DateTime   @updatedAt
+
+    subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+    topic   Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+    testQuestions TestQuestion[]
+
+    @@map("questions")
+}
+
+model Test {
+    id             String     @id @default(auto()) @map("_id") @db.ObjectId
+    name           String
+    subjects       String[]   @db.ObjectId
+    topics         String[]   @db.ObjectId
+    difficulty     Difficulty @default(MEDIUM)
+    duration       Int
+    totalQuestions Int
+    isActive       Boolean    @default(true)
+    createdAt      DateTime   @default(now())
+    updatedAt      DateTime   @updatedAt
+
+    testResults TestResult[]
+
+    @@map("tests")
+}
+
+model TestResult {
+    id             String     @id @default(auto()) @map("_id") @db.ObjectId
+    userId         String     @db.ObjectId
+    testId         String     @db.ObjectId
+    testName       String
+    subjects       String[]
+    topics         String[]
+    difficulty     Difficulty
+    totalQuestions Int
+    correctAnswers Int
+    score          Float
+    timeSpent      Int
+    subjectScores  Json
+    isComplete     Boolean    @default(false)
+    completedAt    DateTime   @default(now())
+
+    user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+    test      Test           @relation(fields: [testId], references: [id], onDelete: Cascade)
+    questions TestQuestion[]
+
+    @@map("test_results")
+}
+
+model TestQuestion {
+    id           String  @id @default(auto()) @map("_id") @db.ObjectId
+    testResultId String  @db.ObjectId
+    questionId   String  @db.ObjectId
+    userAnswer   Int?
+    isCorrect    Boolean
+    timeSpent    Int
+
+    testResult TestResult @relation(fields: [testResultId], references: [id], onDelete: Cascade)
+    question   Question   @relation(fields: [questionId], references: [id])
+
+    @@map("test_questions")
+}
+
+model Video {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    title       String
+    description String?
+    url         String
+    thumbnail   String?
+    duration    Int?
+    subjectId   String?  @db.ObjectId
+    isActive    Boolean  @default(true)
+    views       Int      @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    subject Subject? @relation(fields: [subjectId], references: [id])
+
+    @@map("videos")
+}
+
+model Material {
+    id          String   @id @default(auto()) @map("_id") @db.ObjectId
+    title       String
+    description String?
+    fileUrl     String
+    fileName    String
+    fileSize    Int
+    fileType    String
+    category    String?
+    isActive    Boolean  @default(true)
+    downloads   Int      @default(0)
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    materialDownloads MaterialDownload[]
+
+    @@map("materials")
+}
+
+model MaterialDownload {
+    id           String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId       String   @db.ObjectId
+    materialId   String   @db.ObjectId
+    downloadedAt DateTime @default(now())
+
+    user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+    @@map("material_downloads")
+}
+
+model ChatSession {
+    id        String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String   @db.ObjectId
+    title     String?
+    isActive  Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    messages ChatMessage[]
+
+    @@map("chat_sessions")
+}
+
+model ChatMessage {
+    id            String      @id @default(auto()) @map("_id") @db.ObjectId
+    chatSessionId String      @db.ObjectId
+    role          MessageRole
+    content       String
+    createdAt     DateTime    @default(now())
+
+    chatSession ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+    @@map("chat_messages")
+}
+
+model News {
+    id          String     @id @default(auto()) @map("_id") @db.ObjectId
+    title       String
+    content     String
+    excerpt     String?
+    image       String?
+    category    String?
+    source      NewsSource @default(INTERNAL)
+    externalUrl String?
+    isPublished Boolean    @default(false)
+    publishedAt DateTime?
+    views       Int        @default(0)
+    createdAt   DateTime   @default(now())
+    updatedAt   DateTime   @updatedAt
+
+    newsViews NewsView[]
+
+    @@map("news")
+}
+
+model NewsView {
+    id       String   @id @default(auto()) @map("_id") @db.ObjectId
+    userId   String   @db.ObjectId
+    newsId   String   @db.ObjectId
+    viewedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+    news News @relation(fields: [newsId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, newsId])
+    @@map("news_views")
+}
+
+model Payment {
+    id        String          @id @default(auto()) @map("_id") @db.ObjectId
+    userId    String          @db.ObjectId
+    amount    Float
+    currency  String          @default("NGN")
+    type      PaymentPlanType
+    status    PaymentStatus   @default(PENDING)
+    reference String          @unique
+    metadata  Json?
+    paidAt    DateTime?
+    createdAt DateTime        @default(now())
+    updatedAt DateTime        @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@map("payments")
+}
+
+// Enums
+enum UserRole {
+    USER
+    ADMIN
+}
+
+enum Difficulty {
+    EASY
+    MEDIUM
+    HARD
+}
+
+enum MessageRole {
+    USER
+    ASSISTANT
+}
+
+enum NewsSource {
+    INTERNAL
+    EXTERNAL
+}
+
+enum PaymentPlanType {
+    MONTHLY
+    YEARLY
+    LIFETIME
+}
+
+enum PaymentStatus {
+    PENDING
+    SUCCESS
+    FAILED
+    CANCELLED
+}
